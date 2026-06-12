@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>APEX AI LK — Premium Digital Products & AI Subscriptions</title>
+  <meta name="description" content="APEX AI LK — Your trusted source for premium digital products, AI subscriptions, and developer tools in Sri Lanka. ChatGPT, Gemini, Canva, CapCut, and more.">
+  <meta name="theme-color" content="#0a0e27">
+  <link rel="icon" href="logo.jpeg" type="image/jpeg">
+  <link rel="apple-touch-icon" href="logo.jpeg">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header id="app-header">
+    <div class="header-brand" onclick="navigateTo('store')" style="cursor:pointer">
+      <img src="logo.jpeg" alt="APEX AI LK" class="header-logo">
+      <span class="header-title">APEX AI LK</span>
+    </div>
+    <div class="header-right">
+      <nav class="header-nav">
+        <button data-page="store" class="active" onclick="navigateTo('store')">🏪 Store</button>
+      </nav>
+      <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+    </div>
+  </header>
+
+  <!-- Pages -->
+  <main id="page-container">
+    <div id="store-page" class="page active"></div>
+    <div id="payment-page" class="page"></div>
+    <div id="admin-page" class="page"></div>
+  </main>
+
+  <!-- Bottom Nav (mobile) -->
+  <nav id="bottom-nav">
+    <button data-page="store" class="active" onclick="navigateTo('store')">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1"/></svg>
+      Store
+    </button>
+  </nav>
+
+  <!-- WhatsApp Float -->
+  <a href="https://wa.me/94762945465" target="_blank" class="wa-float" title="Chat on WhatsApp">
+    <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.612.638l4.604-1.209A11.95 11.95 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.308-.725-5.992-1.953l-.418-.312-3.06.803.818-2.988-.343-.443A9.96 9.96 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+  </a>
+
+  <!-- Footer -->
+  <footer id="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img src="logo.jpeg" alt="APEX AI LK" class="footer-logo">
+        <span class="footer-title">APEX AI LK</span>
+      </div>
+      <p class="footer-desc">Premium Digital Products & AI Subscriptions</p>
+      <div class="footer-links">
+        <a href="https://wa.me/94762945465" target="_blank" class="footer-link">💬 WhatsApp</a>
+        <a href="https://whatsapp.com/channel/0029VbD5kgnEwEk0fd9sdM2H" target="_blank" class="footer-link">📢 WhatsApp Channel</a>
+      </div>
+      <div class="footer-copy">© 2026 APEX AI LK™ — All rights reserved.</div>
+    </div>
+  </footer>
+
+  <!-- Modal -->
+  <div id="modal-overlay" class="modal-overlay"></div>
+
+  <!-- Scripts -->
+  <script src="js/data.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/payment.js"></script>
+  <script src="js/admin.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
