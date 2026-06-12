@@ -272,6 +272,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--txt);min-height:10
   .hero{padding:20px 14px}
   .hero h1{font-size:18px}
   .form-row{grid-template-columns:1fr}
-  #site-footer{padding:24px 16px}
+  #site-footer{padding:24px 16px;margin-bottom:60px}
 }
 @media(max-width:380px){.product-grid{grid-template-columns:1fr}}

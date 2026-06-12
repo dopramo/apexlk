@@ -16,7 +16,7 @@ function renderStorePage() {
     <div class="product-grid" id="product-grid"></div>
   `;
   renderCategoryPills();
-  renderProducts(products);
+  renderProducts(sortProducts(products));
   document.getElementById('search-input').addEventListener('input', handleSearch);
 }
 
@@ -40,7 +40,16 @@ function filterProducts() {
   let products = getProducts();
   if (cat !== 'all') products = products.filter(p => p.category === cat);
   if (q) products = products.filter(p => p.name.toLowerCase().includes(q) || p.duration.toLowerCase().includes(q) || p.warranty.toLowerCase().includes(q));
-  renderProducts(products);
+  renderProducts(sortProducts(products));
+}
+
+function sortProducts(products) {
+  const badgeOrder = { 'HOT': 0, 'NEW': 1, 'LIMITED': 2 };
+  return products.sort((a, b) => {
+    const aOrder = a.badge && badgeOrder[a.badge] !== undefined ? badgeOrder[a.badge] : 9;
+    const bOrder = b.badge && badgeOrder[b.badge] !== undefined ? badgeOrder[b.badge] : 9;
+    return aOrder - bOrder;
+  });
 }
 
 function handleSearch() { filterProducts(); }
