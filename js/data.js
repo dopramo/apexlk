@@ -1,4 +1,11 @@
-// ===== APEX AI LK — Product Data Model =====
+// ===== APEX AI LK — Data Model with Supabase =====
+const SUPABASE_URL = 'https://vmgijunhlgjdhxkkhowb.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtZ2lqdW5obGdqZGh4a2tob3diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyODMyNjEsImV4cCI6MjA5Njg1OTI2MX0.C7RdJLVwbr_mCL1MRNP29OTvGneU-MaKCo2CtpodfQ8';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// In-memory cache for fast rendering
+let _productsCache = [];
+
 const CATEGORIES = [
   { id: 'all', name: 'All', emoji: '🏷️' },
   { id: 'ai-assistants', name: 'AI Assistants', emoji: '🤖' },
@@ -31,55 +38,88 @@ const BRAND_STYLES = {
   vcc:        { bg:'#FF9F0A', letter:'💳', logo:null },
 };
 
-const DEFAULT_PRODUCTS = [
-  { id:'gemini-pro-18m', name:'Gemini Pro', category:'ai-assistants', price:2500, stock:10, duration:'18 Months', warranty:'Full Warranty', icon:'gemini', badge:'HOT' },
-  { id:'chatgpt-plus-1m-fw', name:'ChatGPT Plus', category:'ai-assistants', price:1500, stock:15, duration:'1 Month', warranty:'Full Warranty', icon:'chatgpt', badge:null },
-  { id:'chatgpt-plus-1m-5dw', name:'ChatGPT Plus', category:'ai-assistants', price:1200, stock:20, duration:'1 Month', warranty:'5 Days Warranty', icon:'chatgpt', badge:null },
-  { id:'chatgpt-plus-1m-20dw', name:'ChatGPT Plus', category:'ai-assistants', price:1000, stock:8, duration:'1 Month', warranty:'20 Days Warranty', icon:'chatgpt', badge:null },
-  { id:'chatgpt-go-3m', name:'ChatGPT Go', category:'ai-assistants', price:2000, stock:12, duration:'3 Months', warranty:'Full Warranty', icon:'chatgpt', badge:null },
-  { id:'chatgpt-go-3m-nw', name:'ChatGPT Go Link', category:'ai-assistants', price:1800, stock:5, duration:'3 Months', warranty:'No Warranty', icon:'chatgpt', badge:null },
-  { id:'grok-7-10d', name:'Grok', category:'ai-assistants', price:800, stock:15, duration:'7-10 Days', warranty:'No Warranty', icon:'grok', badge:null },
-  { id:'supergrok-1m-3dw', name:'Super Grok', category:'ai-assistants', price:1500, stock:7, duration:'1 Month', warranty:'3 Days Warranty', icon:'grok', badge:null },
-  { id:'supergrok-1m-fw', name:'SuperGrok', category:'ai-assistants', price:2000, stock:5, duration:'1 Month', warranty:'Full Warranty', icon:'grok', badge:'NEW' },
-  { id:'perplexity-pro-1y', name:'Perplexity PRO', category:'ai-assistants', price:3500, stock:5, duration:'1 Year', warranty:'Full Warranty', icon:'perplexity', badge:'HOT' },
-  { id:'claude-x5', name:'Claude x5 Manual Activate', category:'ai-assistants', price:2500, stock:3, duration:'Manual', warranty:'Manual Activate', icon:'claude', badge:'LIMITED' },
-  { id:'capcut-pro-7d', name:'CapCut Pro', category:'video-design', price:500, stock:20, duration:'7 Days', warranty:'No Warranty', icon:'capcut', badge:null },
-  { id:'capcut-1m', name:'CapCut Individual', category:'video-design', price:800, stock:15, duration:'1 Month', warranty:'No Warranty', icon:'capcut', badge:null },
-  { id:'capcut-1m-fw', name:'CapCut Individual Pro', category:'video-design', price:1000, stock:10, duration:'1 Month', warranty:'Full Warranty', icon:'capcut', badge:null },
-  { id:'capcut-6m', name:'CapCut Individual', category:'video-design', price:2500, stock:8, duration:'6 Months', warranty:'No Warranty', icon:'capcut', badge:'HOT' },
-  { id:'figma-edu-1y', name:'Figma EDU (PRO)', category:'video-design', price:2000, stock:6, duration:'1 Year', warranty:'Full Warranty', icon:'figma', badge:null },
-  { id:'canva-invite-3y', name:'Canva Invite', category:'video-design', price:1500, stock:12, duration:'3 Years', warranty:'Full Warranty', icon:'canva', badge:null },
-  { id:'canva-panel-500-3y', name:'Canva Panel 500', category:'video-design', price:5000, stock:3, duration:'3 Years', warranty:'Full Warranty', icon:'canva', badge:'LIMITED' },
-  { id:'canva-panel-500-3y-nw', name:'Canva Panel 500', category:'video-design', price:4000, stock:5, duration:'3 Years', warranty:'No Warranty', icon:'canva', badge:null },
-  { id:'higgsfield-starter', name:'HiggsField Starter', category:'video-design', price:1000, stock:10, duration:'Starter', warranty:'No Warranty', icon:'higgsfield', badge:'NEW' },
-  { id:'gamma-1m-ultra', name:'Gamma Ultra Plan', category:'video-design', price:1200, stock:8, duration:'1 Month', warranty:'Full Warranty', icon:'gamma', badge:null },
-  { id:'spotify-3m', name:'Spotify Premium', category:'entertainment', price:1000, stock:15, duration:'3 Months', warranty:'Full Warranty', icon:'spotify', badge:null },
-  { id:'supabase-pro-12m', name:'Supabase Pro', category:'dev-tools', price:3000, stock:5, duration:'12 Months', warranty:'Full Warranty', icon:'supabase', badge:'NEW' },
-  { id:'replit-core-12m', name:'Replit Core Coupon', category:'dev-tools', price:2500, stock:8, duration:'12 Months', warranty:'Coupon', icon:'replit', badge:null },
-  { id:'lovable-lite-300', name:'Lovable LITE 300 Credits', category:'dev-tools', price:2000, stock:10, duration:'300 Credits', warranty:'Full Warranty', icon:'lovable', badge:null },
-  { id:'linkedin-sales-nav', name:'LinkedIn Sales Navigator', category:'professional', price:3000, stock:5, duration:'Premium', warranty:'Full Warranty', icon:'linkedin', badge:null },
-  { id:'linkedin-career', name:'LinkedIn Career', category:'professional', price:2000, stock:8, duration:'Premium', warranty:'Full Warranty', icon:'linkedin', badge:null },
-  { id:'linkedin-business', name:'LinkedIn Business', category:'professional', price:2500, stock:6, duration:'Premium', warranty:'Full Warranty', icon:'linkedin', badge:null },
-  { id:'zoom-pro-14d', name:'Zoom Pro Account', category:'professional', price:800, stock:12, duration:'14 Days', warranty:'No Warranty', icon:'zoom', badge:null },
-  { id:'gmail-old', name:'Old Gmail (2022-2024)', category:'accounts', price:300, stock:50, duration:'Account', warranty:'No Warranty', icon:'gmail', badge:null },
-  { id:'outlook-mails', name:'Outlook Mails', category:'accounts', price:200, stock:100, duration:'Account', warranty:'No Warranty', icon:'outlook', badge:null },
-  { id:'trial-vcc-4859', name:'Trial Card VCC [4859]', category:'accounts', price:500, stock:20, duration:'Card', warranty:'No Warranty', icon:'vcc', badge:null },
-  { id:'trial-vcc', name:'Trial Cards VCC', category:'accounts', price:400, stock:25, duration:'Card', warranty:'No Warranty', icon:'vcc', badge:null },
-];
-
 const STORAGE_KEY = 'apexailk_products';
 const PIN_KEY = 'apexailk_pin';
 const DEFAULT_PIN = '562783';
 
-function getProducts() {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) { try { return JSON.parse(stored); } catch(e) {} }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCTS));
-  return [...DEFAULT_PRODUCTS];
+// ===== Supabase row → JS object mapping =====
+function rowToProduct(row) {
+  return {
+    id: row.id, name: row.name, category: row.category,
+    price: row.price, stock: row.stock, duration: row.duration,
+    warranty: row.warranty, icon: row.icon,
+    badge: row.badge || null,
+    logoUrl: row.logo_url || null,
+  };
 }
-function saveProducts(products) { localStorage.setItem(STORAGE_KEY, JSON.stringify(products)); }
+function productToRow(p) {
+  return {
+    id: p.id, name: p.name, category: p.category,
+    price: p.price, stock: p.stock, duration: p.duration,
+    warranty: p.warranty, icon: p.icon,
+    badge: p.badge || null,
+    logo_url: p.logoUrl || null,
+  };
+}
+
+// ===== Fetch products (Supabase → cache) =====
+async function fetchProducts() {
+  try {
+    const { data, error } = await supabase.from('products').select('*').order('created_at');
+    if (error) throw error;
+    _productsCache = data.map(rowToProduct);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(_productsCache));
+    return _productsCache;
+  } catch (e) {
+    console.warn('Supabase fetch failed, using local cache:', e.message);
+    return getProductsLocal();
+  }
+}
+
+// ===== Local fallback =====
+function getProductsLocal() {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored) { try { _productsCache = JSON.parse(stored); return _productsCache; } catch(e) {} }
+  return [];
+}
+
+// ===== Sync getter (returns cache) =====
+function getProducts() { return [..._productsCache]; }
+
+// ===== CRUD operations (write to Supabase + update cache) =====
+async function saveProduct(product) {
+  const row = productToRow(product);
+  const { error } = await supabase.from('products').upsert(row, { onConflict: 'id' });
+  if (error) { showToast('Save failed: ' + error.message, 'error'); return false; }
+  const idx = _productsCache.findIndex(p => p.id === product.id);
+  if (idx >= 0) _productsCache[idx] = product; else _productsCache.push(product);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(_productsCache));
+  return true;
+}
+
+async function deleteProductFromDB(id) {
+  const { error } = await supabase.from('products').delete().eq('id', id);
+  if (error) { showToast('Delete failed: ' + error.message, 'error'); return false; }
+  _productsCache = _productsCache.filter(p => p.id !== id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(_productsCache));
+  return true;
+}
+
+async function saveAllProducts(products) {
+  // Delete all then insert fresh (for import/reset)
+  const { error: delErr } = await supabase.from('products').delete().neq('id', '');
+  if (delErr) { showToast('Reset failed: ' + delErr.message, 'error'); return false; }
+  const rows = products.map(productToRow);
+  const { error } = await supabase.from('products').insert(rows);
+  if (error) { showToast('Insert failed: ' + error.message, 'error'); return false; }
+  _productsCache = [...products];
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(_productsCache));
+  return true;
+}
+
+// Legacy sync wrappers (for backward compat)
+function saveProducts(products) { localStorage.setItem(STORAGE_KEY, JSON.stringify(products)); _productsCache = products; }
 function getPin() { return localStorage.getItem(PIN_KEY) || DEFAULT_PIN; }
-function resetProducts() { localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCTS)); return [...DEFAULT_PRODUCTS]; }
 function generateId(name) { return name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'')+'-'+Date.now().toString(36); }
 
 function renderBrandIcon(iconKey, size, customLogoUrl) {

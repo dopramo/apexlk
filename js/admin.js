@@ -1,4 +1,4 @@
-// ===== Admin Panel =====
+// ===== Admin Panel — Supabase Connected =====
 let adminAuthed = false;
 
 function renderAdminPage() {
@@ -14,13 +14,15 @@ function renderAdminPage() {
         <button class="admin-btn primary" onclick="showAddProductModal()">+ Add Product</button>
         <button class="admin-btn secondary" onclick="exportData()">📤 Export</button>
         <button class="admin-btn secondary" onclick="importData()">📥 Import</button>
-        <button class="admin-btn danger" onclick="resetAllProducts()">🔄 Reset</button>
+        <button class="admin-btn secondary" onclick="syncFromSupabase()">🔄 Sync</button>
+        <button class="admin-btn danger" onclick="resetAllProducts()">♻️ Reset</button>
       </div>
     </div>
     <div class="admin-stats">
       <div class="stat-card"><div class="stat-num">${products.length}</div><div class="stat-label">Total Products</div></div>
       <div class="stat-card"><div class="stat-num">${inStock}</div><div class="stat-label">In Stock</div></div>
       <div class="stat-card"><div class="stat-num">${outStock}</div><div class="stat-label">Out of Stock</div></div>
+      <div class="stat-card"><div class="stat-num" style="font-size:14px;color:var(--green)">☁️ Supabase</div><div class="stat-label">Connected</div></div>
     </div>
     <div class="admin-table-wrap">
       <table class="admin-table">
@@ -56,7 +58,7 @@ function adminRow(p) {
       <option value="NEW"${p.badge==='NEW'?' selected':''}>NEW</option>
       <option value="LIMITED"${p.badge==='LIMITED'?' selected':''}>LIMITED</option>
     </select></td>
-    <td><div class="admin-logo-cell"><input value="${p.logoUrl||''}" placeholder="https://..." onchange="updateField('${p.id}','logoUrl',this.value||null);renderAdminPage()" style="min-width:120px"></div></td>
+    <td><div class="admin-logo-cell"><input value="${p.logoUrl||''}" placeholder="https://..." onchange="updateField('${p.id}','logoUrl',this.value||null)" style="min-width:120px"></div></td>
     <td><button class="toggle-stock ${p.stock>0?'on':'off'}" onclick="toggleStock('${p.id}')"></button></td>
     <td><button class="del-btn" onclick="deleteProduct('${p.id}')">✕</button></td>
   </tr>`;
@@ -92,17 +94,29 @@ function renderPinScreen(container) {
   });
 }
 
-function updateField(id, field, value) {
-  const products = getProducts(); const p = products.find(x => x.id === id);
-  if (p) { p[field] = value; saveProducts(products); }
+// ===== Admin CRUD — All async, writes to Supabase =====
+async function updateField(id, field, value) {
+  const products = getProducts();
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  p[field] = value;
+  const ok = await saveProduct(p);
+  if (ok) showToast('Saved ✓', 'success');
 }
-function toggleStock(id) {
-  const products = getProducts(); const p = products.find(x => x.id === id);
-  if (p) { p.stock = p.stock > 0 ? 0 : 10; saveProducts(products); renderAdminPage(); }
+
+async function toggleStock(id) {
+  const products = getProducts();
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  p.stock = p.stock > 0 ? 0 : 10;
+  const ok = await saveProduct(p);
+  if (ok) { showToast('Stock updated', 'success'); renderAdminPage(); }
 }
-function deleteProduct(id) {
+
+async function deleteProduct(id) {
   if (!confirm('Delete this product?')) return;
-  saveProducts(getProducts().filter(p => p.id !== id)); renderAdminPage(); showToast('Product deleted','success');
+  const ok = await deleteProductFromDB(id);
+  if (ok) { renderAdminPage(); showToast('Product deleted', 'success'); }
 }
 
 function showAddProductModal() {
@@ -126,7 +140,7 @@ function showAddProductModal() {
         <div class="form-group"><label>Warranty</label><input id="np-war" placeholder="e.g. Full Warranty"></div>
       </div>
       <div class="form-group"><label>Badge</label><select id="np-badge"><option value="">None</option><option value="HOT">HOT</option><option value="NEW">NEW</option><option value="LIMITED">LIMITED</option></select></div>
-      <div class="form-group"><label>Custom Logo URL (optional)</label><input id="np-logo" placeholder="https://example.com/logo.png"><p style="font-size:11px;color:var(--txt3);margin-top:4px">Paste a direct image URL for the product logo. Leave blank to use default brand icon.</p></div>
+      <div class="form-group"><label>Custom Logo URL (optional)</label><input id="np-logo" placeholder="https://example.com/logo.png"><p style="font-size:11px;color:var(--txt3);margin-top:4px">Paste a direct image URL for the product logo.</p></div>
       <div style="display:flex;gap:8px;justify-content:center;margin-top:20px">
         <button class="copy-btn" onclick="addNewProduct()">Add Product</button>
         <button class="close-modal" onclick="closeModal()">Cancel</button>
@@ -135,7 +149,7 @@ function showAddProductModal() {
   modal.classList.add('show');
 }
 
-function addNewProduct() {
+async function addNewProduct() {
   const name = document.getElementById('np-name').value.trim();
   if (!name) { showToast('Enter a product name','error'); return; }
   const product = {
@@ -149,8 +163,8 @@ function addNewProduct() {
     badge: document.getElementById('np-badge').value || null,
     logoUrl: document.getElementById('np-logo').value.trim() || null,
   };
-  const products = getProducts(); products.push(product); saveProducts(products);
-  closeModal(); renderAdminPage(); showToast('Product added!','success');
+  const ok = await saveProduct(product);
+  if (ok) { closeModal(); renderAdminPage(); showToast('Product added!','success'); }
 }
 
 function exportData() {
@@ -158,15 +172,67 @@ function exportData() {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'apexailk_products.json'; a.click();
   showToast('Data exported!','success');
 }
-function importData() {
+
+async function importData() {
   const input = document.createElement('input'); input.type='file'; input.accept='.json';
-  input.onchange = e => {
+  input.onchange = async e => {
     const reader = new FileReader();
-    reader.onload = ev => { try { const d=JSON.parse(ev.target.result); if(Array.isArray(d)){saveProducts(d);renderAdminPage();showToast('Imported!','success')}else showToast('Invalid format','error')} catch{showToast('Invalid JSON','error')} };
+    reader.onload = async ev => {
+      try {
+        const d = JSON.parse(ev.target.result);
+        if (!Array.isArray(d)) { showToast('Invalid format','error'); return; }
+        const ok = await saveAllProducts(d);
+        if (ok) { renderAdminPage(); showToast('Imported to Supabase!','success'); }
+      } catch { showToast('Invalid JSON','error'); }
+    };
     reader.readAsText(e.target.files[0]);
   }; input.click();
 }
-function resetAllProducts() {
-  if (!confirm('Reset all products to defaults?')) return;
-  resetProducts(); renderAdminPage(); showToast('Reset done','success');
+
+async function resetAllProducts() {
+  if (!confirm('Reset all products to defaults? This will overwrite Supabase data.')) return;
+  const DEFAULT_PRODUCTS = [
+    {id:'gemini-pro-18m',name:'Gemini Pro',category:'ai-assistants',price:2500,stock:10,duration:'18 Months',warranty:'Full Warranty',icon:'gemini',badge:'HOT',logoUrl:null},
+    {id:'chatgpt-plus-1m-fw',name:'ChatGPT Plus',category:'ai-assistants',price:1500,stock:15,duration:'1 Month',warranty:'Full Warranty',icon:'chatgpt',badge:null,logoUrl:null},
+    {id:'chatgpt-plus-1m-5dw',name:'ChatGPT Plus',category:'ai-assistants',price:1200,stock:20,duration:'1 Month',warranty:'5 Days Warranty',icon:'chatgpt',badge:null,logoUrl:null},
+    {id:'chatgpt-plus-1m-20dw',name:'ChatGPT Plus',category:'ai-assistants',price:1000,stock:8,duration:'1 Month',warranty:'20 Days Warranty',icon:'chatgpt',badge:null,logoUrl:null},
+    {id:'chatgpt-go-3m',name:'ChatGPT Go',category:'ai-assistants',price:2000,stock:12,duration:'3 Months',warranty:'Full Warranty',icon:'chatgpt',badge:null,logoUrl:null},
+    {id:'chatgpt-go-3m-nw',name:'ChatGPT Go Link',category:'ai-assistants',price:1800,stock:5,duration:'3 Months',warranty:'No Warranty',icon:'chatgpt',badge:null,logoUrl:null},
+    {id:'grok-7-10d',name:'Grok',category:'ai-assistants',price:800,stock:15,duration:'7-10 Days',warranty:'No Warranty',icon:'grok',badge:null,logoUrl:null},
+    {id:'supergrok-1m-3dw',name:'Super Grok',category:'ai-assistants',price:1500,stock:7,duration:'1 Month',warranty:'3 Days Warranty',icon:'grok',badge:null,logoUrl:null},
+    {id:'supergrok-1m-fw',name:'SuperGrok',category:'ai-assistants',price:2000,stock:5,duration:'1 Month',warranty:'Full Warranty',icon:'grok',badge:'NEW',logoUrl:null},
+    {id:'perplexity-pro-1y',name:'Perplexity PRO',category:'ai-assistants',price:3500,stock:5,duration:'1 Year',warranty:'Full Warranty',icon:'perplexity',badge:'HOT',logoUrl:null},
+    {id:'claude-x5',name:'Claude x5 Manual Activate',category:'ai-assistants',price:2500,stock:3,duration:'Manual',warranty:'Manual Activate',icon:'claude',badge:'LIMITED',logoUrl:null},
+    {id:'capcut-pro-7d',name:'CapCut Pro',category:'video-design',price:500,stock:20,duration:'7 Days',warranty:'No Warranty',icon:'capcut',badge:null,logoUrl:null},
+    {id:'capcut-1m',name:'CapCut Individual',category:'video-design',price:800,stock:15,duration:'1 Month',warranty:'No Warranty',icon:'capcut',badge:null,logoUrl:null},
+    {id:'capcut-1m-fw',name:'CapCut Individual Pro',category:'video-design',price:1000,stock:10,duration:'1 Month',warranty:'Full Warranty',icon:'capcut',badge:null,logoUrl:null},
+    {id:'capcut-6m',name:'CapCut Individual',category:'video-design',price:2500,stock:8,duration:'6 Months',warranty:'No Warranty',icon:'capcut',badge:'HOT',logoUrl:null},
+    {id:'figma-edu-1y',name:'Figma EDU (PRO)',category:'video-design',price:2000,stock:6,duration:'1 Year',warranty:'Full Warranty',icon:'figma',badge:null,logoUrl:null},
+    {id:'canva-invite-3y',name:'Canva Invite',category:'video-design',price:1500,stock:12,duration:'3 Years',warranty:'Full Warranty',icon:'canva',badge:null,logoUrl:null},
+    {id:'canva-panel-500-3y',name:'Canva Panel 500',category:'video-design',price:5000,stock:3,duration:'3 Years',warranty:'Full Warranty',icon:'canva',badge:'LIMITED',logoUrl:null},
+    {id:'canva-panel-500-3y-nw',name:'Canva Panel 500',category:'video-design',price:4000,stock:5,duration:'3 Years',warranty:'No Warranty',icon:'canva',badge:null,logoUrl:null},
+    {id:'higgsfield-starter',name:'HiggsField Starter',category:'video-design',price:1000,stock:10,duration:'Starter',warranty:'No Warranty',icon:'higgsfield',badge:'NEW',logoUrl:null},
+    {id:'gamma-1m-ultra',name:'Gamma Ultra Plan',category:'video-design',price:1200,stock:8,duration:'1 Month',warranty:'Full Warranty',icon:'gamma',badge:null,logoUrl:null},
+    {id:'spotify-3m',name:'Spotify Premium',category:'entertainment',price:1000,stock:15,duration:'3 Months',warranty:'Full Warranty',icon:'spotify',badge:null,logoUrl:null},
+    {id:'supabase-pro-12m',name:'Supabase Pro',category:'dev-tools',price:3000,stock:5,duration:'12 Months',warranty:'Full Warranty',icon:'supabase',badge:'NEW',logoUrl:null},
+    {id:'replit-core-12m',name:'Replit Core Coupon',category:'dev-tools',price:2500,stock:8,duration:'12 Months',warranty:'Coupon',icon:'replit',badge:null,logoUrl:null},
+    {id:'lovable-lite-300',name:'Lovable LITE 300 Credits',category:'dev-tools',price:2000,stock:10,duration:'300 Credits',warranty:'Full Warranty',icon:'lovable',badge:null,logoUrl:null},
+    {id:'linkedin-sales-nav',name:'LinkedIn Sales Navigator',category:'professional',price:3000,stock:5,duration:'Premium',warranty:'Full Warranty',icon:'linkedin',badge:null,logoUrl:null},
+    {id:'linkedin-career',name:'LinkedIn Career',category:'professional',price:2000,stock:8,duration:'Premium',warranty:'Full Warranty',icon:'linkedin',badge:null,logoUrl:null},
+    {id:'linkedin-business',name:'LinkedIn Business',category:'professional',price:2500,stock:6,duration:'Premium',warranty:'Full Warranty',icon:'linkedin',badge:null,logoUrl:null},
+    {id:'zoom-pro-14d',name:'Zoom Pro Account',category:'professional',price:800,stock:12,duration:'14 Days',warranty:'No Warranty',icon:'zoom',badge:null,logoUrl:null},
+    {id:'gmail-old',name:'Old Gmail (2022-2024)',category:'accounts',price:300,stock:50,duration:'Account',warranty:'No Warranty',icon:'gmail',badge:null,logoUrl:null},
+    {id:'outlook-mails',name:'Outlook Mails',category:'accounts',price:200,stock:100,duration:'Account',warranty:'No Warranty',icon:'outlook',badge:null,logoUrl:null},
+    {id:'trial-vcc-4859',name:'Trial Card VCC [4859]',category:'accounts',price:500,stock:20,duration:'Card',warranty:'No Warranty',icon:'vcc',badge:null,logoUrl:null},
+    {id:'trial-vcc',name:'Trial Cards VCC',category:'accounts',price:400,stock:25,duration:'Card',warranty:'No Warranty',icon:'vcc',badge:null,logoUrl:null},
+  ];
+  const ok = await saveAllProducts(DEFAULT_PRODUCTS);
+  if (ok) { renderAdminPage(); showToast('Reset to defaults!','success'); }
+}
+
+async function syncFromSupabase() {
+  showToast('Syncing...','success');
+  await fetchProducts();
+  renderAdminPage();
+  showToast('Synced from Supabase!','success');
 }

@@ -31,10 +31,12 @@ function setTheme(theme) {
 function toggleTheme() { setTheme(getTheme() === 'dark' ? 'light' : 'dark'); }
 function initTheme() { setTheme(getTheme()); }
 
-// Init
+// Init — fetch from Supabase first, then render
 window.addEventListener('hashchange', handleRoute);
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   initTheme();
   document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target.id === 'modal-overlay') closeModal(); });
+  // Load products from Supabase (falls back to localStorage if offline)
+  await fetchProducts();
   handleRoute();
 });
