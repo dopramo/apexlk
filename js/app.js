@@ -49,5 +49,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   initTheme();
   document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target.id === 'modal-overlay') closeModal(); });
   await fetchProducts();
+  subscribeToRealtime();
   handleRoute();
 });

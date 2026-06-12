@@ -176,3 +176,45 @@ function renderBrandIcon(iconKey, size, customLogoUrl) {
     <span class="fallback-letter">${brand.letter}</span>
   </div>`;
 }
+
+// ===== Supabase Realtime — live sync =====
+function subscribeToRealtime() {
+  if (!_supabaseClient) return;
+  _supabaseClient
+    .channel('products-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
+      console.log('🔄 Realtime:', payload.eventType, payload.new?.id || payload.old?.id);
+
+      if (payload.eventType === 'INSERT') {
+        const product = rowToProduct(payload.new);
+        if (!_productsCache.find(p => p.id === product.id)) {
+          _productsCache.push(product);
+        }
+      } else if (payload.eventType === 'UPDATE') {
+        const updated = rowToProduct(payload.new);
+        const idx = _productsCache.findIndex(p => p.id === updated.id);
+        if (idx >= 0) _productsCache[idx] = updated;
+      } else if (payload.eventType === 'DELETE') {
+        const oldId = payload.old?.id;
+        if (oldId) _productsCache = _productsCache.filter(p => p.id !== oldId);
+      }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(_productsCache));
+      refreshCurrentPage();
+    })
+    .subscribe((status) => {
+      console.log('📡 Realtime status:', status);
+    });
+}
+
+// Re-render whichever page is currently active
+function refreshCurrentPage() {
+  const hash = window.location.hash.replace('#','') || 'store';
+  if (hash === 'store') {
+    const grid = document.getElementById('product-grid');
+    if (grid) renderStorePage();
+  } else if (hash === 'admin') {
+    const tbody = document.getElementById('admin-tbody');
+    if (tbody && typeof adminAuthed !== 'undefined' && adminAuthed) renderAdminPage();
+  }
+}
