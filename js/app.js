@@ -1,14 +1,26 @@
 // ===== APEX AI LK — Main App Router =====
 function navigateTo(page) { window.location.hash = page; }
 
-function handleRoute() {
+async function handleRoute() {
   const hash = window.location.hash.replace('#','') || 'store';
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.header-nav button, #bottom-nav button').forEach(b => b.classList.remove('active'));
-  if (hash === 'store') { document.getElementById('store-page').classList.add('active'); renderStorePage(); }
-  else if (hash === 'payment') { document.getElementById('payment-page').classList.add('active'); renderPaymentPage(window._selectedProduct); }
-  else if (hash === 'admin') { document.getElementById('admin-page').classList.add('active'); renderAdminPage(); }
-  else { document.getElementById('store-page').classList.add('active'); renderStorePage(); }
+
+  if (hash === 'store') {
+    document.getElementById('store-page').classList.add('active');
+    await fetchProducts(); // Always get fresh data from Supabase
+    renderStorePage();
+  } else if (hash === 'payment') {
+    document.getElementById('payment-page').classList.add('active');
+    renderPaymentPage(window._selectedProduct);
+  } else if (hash === 'admin') {
+    document.getElementById('admin-page').classList.add('active');
+    renderAdminPage();
+  } else {
+    document.getElementById('store-page').classList.add('active');
+    await fetchProducts();
+    renderStorePage();
+  }
   document.querySelectorAll(`[data-page="${hash}"]`).forEach(b => b.classList.add('active'));
 }
 
@@ -31,12 +43,11 @@ function setTheme(theme) {
 function toggleTheme() { setTheme(getTheme() === 'dark' ? 'light' : 'dark'); }
 function initTheme() { setTheme(getTheme()); }
 
-// Init — fetch from Supabase first, then render
-window.addEventListener('hashchange', handleRoute);
+// Init
+window.addEventListener('hashchange', () => handleRoute());
 window.addEventListener('DOMContentLoaded', async () => {
   initTheme();
   document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target.id === 'modal-overlay') closeModal(); });
-  // Load products from Supabase (falls back to localStorage if offline)
   await fetchProducts();
   handleRoute();
 });

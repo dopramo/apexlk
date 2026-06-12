@@ -96,17 +96,17 @@ function renderPinScreen(container) {
 
 // ===== Admin CRUD — All async, writes to Supabase =====
 async function updateField(id, field, value) {
-  const products = getProducts();
-  const p = products.find(x => x.id === id);
-  if (!p) return;
+  // Get direct reference from cache (not a copy)
+  const p = getProductDirect(id);
+  if (!p) { showToast('Product not found', 'error'); return; }
   p[field] = value;
   const ok = await saveProduct(p);
   if (ok) showToast('Saved ✓', 'success');
+  else showToast('Save failed', 'error');
 }
 
 async function toggleStock(id) {
-  const products = getProducts();
-  const p = products.find(x => x.id === id);
+  const p = getProductDirect(id);
   if (!p) return;
   p.stock = p.stock > 0 ? 0 : 10;
   const ok = await saveProduct(p);

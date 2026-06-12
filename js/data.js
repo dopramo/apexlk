@@ -100,20 +100,28 @@ function getProductsLocal() {
 
 // ===== Sync getter (returns cache) =====
 function getProducts() { return [..._productsCache]; }
+function getProductDirect(id) { return _productsCache.find(p => p.id === id); }
 
 // ===== CRUD — writes to Supabase + updates local cache =====
 async function saveProduct(product) {
   if (!_supabaseClient) { showToast('No database connection', 'error'); return false; }
   try {
     const row = productToRow(product);
-    const { error } = await _supabaseClient.from('products').upsert(row, { onConflict: 'id' });
+    const { data, error } = await _supabaseClient
+      .from('products')
+      .upsert(row, { onConflict: 'id' })
+      .select();
     if (error) throw error;
+    // Update cache from Supabase response to ensure sync
+    const saved = data && data[0] ? rowToProduct(data[0]) : { ...product };
     const idx = _productsCache.findIndex(p => p.id === product.id);
-    if (idx >= 0) _productsCache[idx] = { ...product }; else _productsCache.push({ ...product });
+    if (idx >= 0) _productsCache[idx] = saved; else _productsCache.push(saved);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(_productsCache));
+    console.log('✅ Saved product:', saved.id, 'logoUrl:', saved.logoUrl);
     return true;
   } catch (e) {
     showToast('Save failed: ' + e.message, 'error');
+    console.error('Save error:', e);
     return false;
   }
 }
