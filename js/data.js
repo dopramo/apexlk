@@ -1,7 +1,15 @@
 // ===== APEX AI LK — Data Model with Supabase =====
 const SUPABASE_URL = 'https://vmgijunhlgjdhxkkhowb.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtZ2lqdW5obGdqZGh4a2tob3diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyODMyNjEsImV4cCI6MjA5Njg1OTI2MX0.C7RdJLVwbr_mCL1MRNP29OTvGneU-MaKCo2CtpodfQ8';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Use a different variable name to avoid shadowing the global 'supabase' from CDN
+let _supabaseClient = null;
+try {
+  _supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  console.log('✅ Supabase client initialized');
+} catch (e) {
+  console.error('❌ Supabase init failed:', e.message);
+}
 
 // In-memory cache for fast rendering
 let _productsCache = [];
@@ -42,7 +50,7 @@ const STORAGE_KEY = 'apexailk_products';
 const PIN_KEY = 'apexailk_pin';
 const DEFAULT_PIN = '562783';
 
-// ===== Supabase row → JS object mapping =====
+// ===== Supabase row ↔ JS object mapping =====
 function rowToProduct(row) {
   return {
     id: row.id, name: row.name, category: row.category,
@@ -62,13 +70,18 @@ function productToRow(p) {
   };
 }
 
-// ===== Fetch products (Supabase → cache) =====
+// ===== Fetch products from Supabase → cache =====
 async function fetchProducts() {
+  if (!_supabaseClient) {
+    console.warn('No Supabase client, using local cache');
+    return getProductsLocal();
+  }
   try {
-    const { data, error } = await supabase.from('products').select('*').order('created_at');
+    const { data, error } = await _supabaseClient.from('products').select('*').order('created_at');
     if (error) throw error;
     _productsCache = data.map(rowToProduct);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(_productsCache));
+    console.log('✅ Fetched', _productsCache.length, 'products from Supabase');
     return _productsCache;
   } catch (e) {
     console.warn('Supabase fetch failed, using local cache:', e.message);
@@ -79,45 +92,64 @@ async function fetchProducts() {
 // ===== Local fallback =====
 function getProductsLocal() {
   const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) { try { _productsCache = JSON.parse(stored); return _productsCache; } catch(e) {} }
+  if (stored) {
+    try { _productsCache = JSON.parse(stored); return _productsCache; } catch(e) {}
+  }
   return [];
 }
 
 // ===== Sync getter (returns cache) =====
 function getProducts() { return [..._productsCache]; }
 
-// ===== CRUD operations (write to Supabase + update cache) =====
+// ===== CRUD — writes to Supabase + updates local cache =====
 async function saveProduct(product) {
-  const row = productToRow(product);
-  const { error } = await supabase.from('products').upsert(row, { onConflict: 'id' });
-  if (error) { showToast('Save failed: ' + error.message, 'error'); return false; }
-  const idx = _productsCache.findIndex(p => p.id === product.id);
-  if (idx >= 0) _productsCache[idx] = product; else _productsCache.push(product);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(_productsCache));
-  return true;
+  if (!_supabaseClient) { showToast('No database connection', 'error'); return false; }
+  try {
+    const row = productToRow(product);
+    const { error } = await _supabaseClient.from('products').upsert(row, { onConflict: 'id' });
+    if (error) throw error;
+    const idx = _productsCache.findIndex(p => p.id === product.id);
+    if (idx >= 0) _productsCache[idx] = { ...product }; else _productsCache.push({ ...product });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(_productsCache));
+    return true;
+  } catch (e) {
+    showToast('Save failed: ' + e.message, 'error');
+    return false;
+  }
 }
 
 async function deleteProductFromDB(id) {
-  const { error } = await supabase.from('products').delete().eq('id', id);
-  if (error) { showToast('Delete failed: ' + error.message, 'error'); return false; }
-  _productsCache = _productsCache.filter(p => p.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(_productsCache));
-  return true;
+  if (!_supabaseClient) { showToast('No database connection', 'error'); return false; }
+  try {
+    const { error } = await _supabaseClient.from('products').delete().eq('id', id);
+    if (error) throw error;
+    _productsCache = _productsCache.filter(p => p.id !== id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(_productsCache));
+    return true;
+  } catch (e) {
+    showToast('Delete failed: ' + e.message, 'error');
+    return false;
+  }
 }
 
 async function saveAllProducts(products) {
-  // Delete all then insert fresh (for import/reset)
-  const { error: delErr } = await supabase.from('products').delete().neq('id', '');
-  if (delErr) { showToast('Reset failed: ' + delErr.message, 'error'); return false; }
-  const rows = products.map(productToRow);
-  const { error } = await supabase.from('products').insert(rows);
-  if (error) { showToast('Insert failed: ' + error.message, 'error'); return false; }
-  _productsCache = [...products];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(_productsCache));
-  return true;
+  if (!_supabaseClient) { showToast('No database connection', 'error'); return false; }
+  try {
+    const { error: delErr } = await _supabaseClient.from('products').delete().neq('id', '');
+    if (delErr) throw delErr;
+    const rows = products.map(productToRow);
+    const { error } = await _supabaseClient.from('products').insert(rows);
+    if (error) throw error;
+    _productsCache = [...products];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(_productsCache));
+    return true;
+  } catch (e) {
+    showToast('Save failed: ' + e.message, 'error');
+    return false;
+  }
 }
 
-// Legacy sync wrappers (for backward compat)
+// ===== Utilities =====
 function saveProducts(products) { localStorage.setItem(STORAGE_KEY, JSON.stringify(products)); _productsCache = products; }
 function getPin() { return localStorage.getItem(PIN_KEY) || DEFAULT_PIN; }
 function generateId(name) { return name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'')+'-'+Date.now().toString(36); }
